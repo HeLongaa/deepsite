@@ -182,41 +182,16 @@ app.post("/api/ask-ai", async (req, res) => {
     });
   }
 
-  const { hf_token } = req.cookies;
-  let token = hf_token;
-  const ip =
-    req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-    req.headers["x-real-ip"] ||
-    req.socket.remoteAddress ||
-    req.ip ||
-    "0.0.0.0";
-
-  if (!hf_token) {
-    // Rate limit requests from the same IP address, to prevent abuse, free is limited to 2 requests per IP
-    ipAddresses.set(ip, (ipAddresses.get(ip) || 0) + 1);
-    if (ipAddresses.get(ip) > MAX_REQUESTS_PER_IP) {
-      return res.status(429).send({
-        ok: false,
-        openLogin: true,
-        message: "Log In to continue using the service",
-      });
-    }
-
-    token = process.env.DEFAULT_HF_TOKEN;
-  }
-
   // Set up response headers for streaming
   res.setHeader("Content-Type", "text/plain");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
-  const client = new InferenceClient(token);
   let completeResponse = "";
 
   try {
-    const chatCompletion = client.chatCompletionStream({
-      model: MODEL_ID,
-      provider: "fireworks-ai",
+    const stream = await openai.chat.completions.create({
+      model: 'deepseek-v3', // 你的模型名称
       messages: [
         {
           role: "system",
@@ -244,23 +219,17 @@ app.post("/api/ask-ai", async (req, res) => {
           content: prompt,
         },
       ],
-      max_tokens: 12_000,
+      stream: true,
     });
 
-    while (true) {
-      const { done, value } = await chatCompletion.next();
-      if (done) {
-        break;
-      }
-      const chunk = value.choices[0]?.delta?.content;
-      if (chunk) {
-        res.write(chunk);
-        completeResponse += chunk;
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      res.write(content);
+      completeResponse += content;
 
-        // Break when HTML is complete
-        if (completeResponse.includes("</html>")) {
-          break;
-        }
+      // Break when HTML is complete
+      if (completeResponse.includes("</html>")) {
+        break;
       }
     }
 
@@ -268,14 +237,12 @@ app.post("/api/ask-ai", async (req, res) => {
     res.end();
   } catch (error) {
     console.error("Error:", error);
-    // If we haven't sent a response yet, send an error
     if (!res.headersSent) {
       res.status(500).send({
         ok: false,
         message: `You probably reached the MAX_TOKENS limit, context is too long. You can start a new conversation by refreshing the page.`,
       });
     } else {
-      // Otherwise end the stream
       res.end();
     }
   }
@@ -288,3 +255,33 @@ app.get("*", (_req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  baseURL: 'http://192.168.1.5:1337/v1',
+  apiKey: 'your-api-key', // 如果需要认证
+});
+
+async function chatCompletionStream(prompt) {
+  const stream = await openai.chat.completions.create({
+    model: 'deepseek-v3', // 你的模型名称
+    messages: [{ role: 'user', content: prompt }],
+    stream: true,
+  });
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || '';
+    res.write(content);
+    completeResponse += content;
+
+    // Break when HTML is complete
+    if (completeResponse.includes("</html>")) {
+      break;
+    }
+  }
+
+  // End the response stream
+  res.end();
+}
