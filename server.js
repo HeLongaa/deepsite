@@ -22,7 +22,7 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.APP_PORT || 3000;
 const REDIRECT_URI =
   process.env.REDIRECT_URI || `http://localhost:${PORT}/auth/login`;
-const MODEL_ID = "deepseek-ai/DeepSeek-V3-0324";
+const MODEL_ID = "deepseek-ai/deepseek-ai/DeepSeek-V2.5-0324";
 const MAX_REQUESTS_PER_IP = 4;
 
 app.use(cookieParser());
@@ -191,7 +191,7 @@ app.post("/api/ask-ai", async (req, res) => {
 
   try {
     const stream = await openai.chat.completions.create({
-      model: 'deepseek-v3', // 你的模型名称
+      model: 'deepseek-ai/DeepSeek-V2.5', // 你的模型名称
       messages: [
         {
           role: "system",
@@ -260,13 +260,13 @@ app.listen(PORT, () => {
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  baseURL: 'http://192.168.1.5:1337/v1',
-  apiKey: 'your-api-key', // 如果需要认证
+  baseURL: 'https://api.helong.online/v1',
+  apiKey: 'sk-g9hgcJEQxWv7vd9KSrNQjTELDkG0aXEYuAFmVFEcdNa6CbBu', // 如果需要认证
 });
 
 async function chatCompletionStream(prompt) {
   const stream = await openai.chat.completions.create({
-    model: 'deepseek-v3', // 你的模型名称
+    model: 'deepseek-ai/DeepSeek-V2.5', // 你的模型名称
     messages: [{ role: 'user', content: prompt }],
     stream: true,
   });
